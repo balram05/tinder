@@ -1,9 +1,27 @@
 const express = require("express");
 
+const {adminAuth} = require("./middleware/auth") 
+
 const app = express();
 
 const port = 3000;
 
+//creating the authication for the admin
+
+// const adminAuth = ("/admin",(res, req, next) => {
+//     const token = "abc"
+//     const authToken = token === "abc";
+//     if (!authToken) {
+//         res.status(401).send("unauthorized")
+//     }
+//     else {
+//         next()
+//     }
+// })
+
+//inside of define the auth as above, 
+//we can also use it for the different file ./middleware/auth.js
+app.use("/admin", adminAuth)
 
 // app.use("/test",(req,res)=>{
 //     res.send("hello for the route test")
@@ -67,6 +85,16 @@ app.get(/.*fly$/, (req, res) => {
 //     console.log(req.params)
 //     res.send("testing")
 // })
+
+//routes for the admin
+app.get("/admin/getdata",(req,res)=>{
+    res.send("getting all the data for the admin")
+})
+
+app.get("/admin/deletedata",(req,res)=>{
+    res.send("delete all the data for the admin")
+})
+
 
 app.use("/middle", (req, res, next) => {
     console.log("in the firt route handler")
