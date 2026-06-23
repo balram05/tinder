@@ -2,7 +2,7 @@ const express = require("express");
 
 // const {adminAuth} = require("./middleware/auth") 
 
-const  connectDB =require("./config/database")
+const connectDB = require("./config/database")
 
 const userSchema = require("./models/user")
 
@@ -123,7 +123,7 @@ const port = 3000;
 
 // error handling
 // app.get("/getuser", (req, res) => {
-    
+
 //     throw new Error("new error")
 //     res.send("getting the user data sucessfully")
 // })
@@ -132,36 +132,140 @@ const port = 3000;
 //         res.status(500).send("get unexpected error")
 //     }
 // })
-app.post("/signup",async(req,res)=>{
-    const user = new userSchema({
-        firstName:"Bale",
-        lastName:"Balram",
-        age:25,
-        email:"balram@gmail.com"
-    }) 
-    try{
- await user.save()
-    res.send("user add successfully")  
+
+// middleware for parsing the body od request for the client
+app.use(express.json())
+// api for the user signup
+app.post("/signup", async (req, res) => {
+    console.log("body", req.body)
+    const user = new userSchema(req.body)
+    try {
+        await user.save()
+        res.send("user add successfully")
     }
-    catch(err){
+    catch (err) {
         res.status(400).send("error while careting new user")
     }
 })
 
-connectDB().then(()=>{
+// api for getting the user
+app.get("/user", async (req, res) => {
+    const userEmail = req.body.email
+
+    // try {
+    //     console.log("email", userEmail)
+    //     const user = await userSchema.find({ email: userEmail })
+    //     if (user.length == 0) {
+    //         res.status(404).send("user not found")
+    //     } else {
+    //         res.send(user)
+    //     }
+
+    // } catch (err) {
+    //     res.status(404).send("user not found")
+    // }
+
+    try{
+        const user = await userSchema.find({email:userEmail})
+             if (user.length == 0) {
+            res.status(404).send("user not found")
+        } else {
+            res.send(user)
+        }
+
+    } catch (err) {
+        res.status(404).send("user not found")
+    }
+
+
+})
+
+app.get("/feed", async(req,res)=>{
+    
+    try{
+        const allUser= await userSchema.find({})
+        res.send(allUser)
+
+    }catch(err){
+        res.status(404).send("no user found")
+
+    }
+})
+
+// thus is the api to find the user by using the mongoDB id
+app.get("/find", async(req,res)=>{
+    const userId = req.body.id
+    try{
+const userid=await userSchema.findById(userId)
+res.send(userid)
+    }catch(err){
+res.status(404).send("no user found")
+    }
+})
+
+
+// this is the api for find by id and delete the user
+app.delete("/user", async(req,res)=>{
+    const deleteUserId = req.body.id
+    try{
+const deleteUser = await userSchema.findByIdAndDelete({_id:deleteUserId})
+if(!deleteUser){
+    return res.status(404).send("user not found")
+    }
+// res.send(deleteUser)
+res.status(200).json({message:"user deleted ",
+data:deleteUser
+})
+    }catch(err){
+res.status(404).send("invaid user id")
+    }
+    
+})
+
+// this is the api, for update the user by id
+
+app.patch("/user", async(req,res)=>{
+    const userId =req.body.id
+    const user = req.body
+    try{
+        const userUpdate= await userSchema.findByIdAndUpdate({_id:userId},user)
+        res.send(userUpdate)
+
+    }catch(err){
+ res.status(404).send("user not found")
+    }
+})
+
+
+//this is the api for upadate the user by email
+app.patch("/userupdate", async(req,res)=>{
+    const {email, ...update}= req.body
+    try{
+        console.log(JSON.stringify(req.body))
+        const user= await userSchema.findOneAndUpdate({email},update)
+        if(!user){
+            res.status(404).send("invalid user")
+        }
+        res.send(user)
+
+    }catch(err){
+ res.status(404).send("user not found")
+    }
+})
+
+
+
+connectDB().then(() => {
     console.log("database is connected successfully")
-    app.listen(port, ()=> {
-    console.log("connted to the sever successfully")
+    app.listen(port, () => {
+        console.log("connted to the sever successfully")
+    })
+}).catch(err => {
+    console.log("database is not connected", err)
 })
-}).catch(err =>{
-console.log("database is not connected",err)
-})
 
 
 
-
-
-// 
 
 
 
