@@ -6,7 +6,20 @@ const connectDB = require("./config/database")
 
 const userSchema = require("./models/user")
 
+const { validationRules } = require("./utils/validations")
+
+const bcrypt = require("bcrypt")
+
+const cookieParser = require('cookie-parser')
+
+const jwt = require('jsonwebtoken');
+
+const {userAuth} = require("./middleware/auth")
+
+
 const app = express();
+
+
 
 const port = 3000;
 
@@ -135,16 +148,80 @@ const port = 3000;
 
 // middleware for parsing the body od request for the client
 app.use(express.json())
-// api for the user signup
-app.post("/signup", async (req, res) => {
-    console.log("body", req.body)
-    const user = new userSchema(req.body)
+
+app.use(cookieParser())
+
+
+app.post("/login", async (req, res) => {
     try {
-        await user.save()
-        res.send("user add successfully")
+        const { email, password } = req.body;
+
+        const user = await userSchema.findOne({ email });
+
+        if (!user) {
+            return res.status(400).json({
+                message: "Invalid user",
+            });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            return res.status(400).json({
+                message: "Invalid password",
+            });
+        }
+
+        // creating the token by using the jesonwebtoken package
+        const token = await jwt.sign({ _id: user._id }, "DEVELOPER@TINDER")
+
+        res.cookie("token", token)
+        res.send("Login successfully");
+    } catch (err) {
+        res.status(500).send("Error: " + err.message);
+    }
+});
+
+app.get("/profile", userAuth, async (req, res) => {
+    // read the cookie for the server we should 
+    // install the cookie parser and it is middele ware 
+    try {
+
+        const user = req.user
+res.send(user)
     }
     catch (err) {
-        res.status(400).send("error while careting new user")
+        res.status(400).send("ERROR " + err.message)
+    }
+})
+
+// api for the user signup
+app.post("/signup", async (req, res) => {
+
+
+    try {
+        // validationRules(req)
+
+        const { firstName, lastName, email, password, gender } = req.body
+
+
+        const hashpasword = await bcrypt.hash(password, 10)
+
+
+        const user = new userSchema({
+            firstName, lastName, email, password: hashpasword, gender
+        })
+
+        //validations run here befor saving the data 
+        await user.save()
+        // res.status(200).json({message:"user created sucessfully",
+        //     data:user
+        // })
+        res.send("successfully created")
+    }
+    catch (err) {
+        console.log(err)
+        res.status(400).send(err.message)
     }
 })
 
@@ -165,9 +242,9 @@ app.get("/user", async (req, res) => {
     //     res.status(404).send("user not found")
     // }
 
-    try{
-        const user = await userSchema.find({email:userEmail})
-             if (user.length == 0) {
+    try {
+        const user = await userSchema.find({ email: userEmail })
+        if (user.length == 0) {
             res.status(404).send("user not found")
         } else {
             res.send(user)
@@ -180,76 +257,123 @@ app.get("/user", async (req, res) => {
 
 })
 
-app.get("/feed", async(req,res)=>{
-    
-    try{
-        const allUser= await userSchema.find({})
+app.get("/feed", async (req, res) => {
+
+    try {
+        const allUser = await userSchema.find({})
         res.send(allUser)
 
-    }catch(err){
+    } catch (err) {
         res.status(404).send("no user found")
 
     }
 })
 
 // thus is the api to find the user by using the mongoDB id
-app.get("/find", async(req,res)=>{
+app.get("/find", async (req, res) => {
     const userId = req.body.id
-    try{
-const userid=await userSchema.findById(userId)
-res.send(userid)
-    }catch(err){
-res.status(404).send("no user found")
+    try {
+        const userid = await userSchema.findById(userId)
+        res.send(userid)
+    } catch (err) {
+        res.status(404).send("no user found")
     }
 })
 
 
 // this is the api for find by id and delete the user
-app.delete("/user", async(req,res)=>{
+app.delete("/user", async (req, res) => {
     const deleteUserId = req.body.id
-    try{
-const deleteUser = await userSchema.findByIdAndDelete({_id:deleteUserId})
-if(!deleteUser){
-    return res.status(404).send("user not found")
+    try {
+        const deleteUser = await userSchema.findByIdAndDelete({ _id: deleteUserId })
+        if (!deleteUser) {
+            return res.status(404).send("user not found")
+        }
+        // res.send(deleteUser)
+        res.status(200).json({
+            message: "user deleted ",
+            data: deleteUser
+        })
+    } catch (err) {
+        res.status(404).send("invaid user id")
     }
-// res.send(deleteUser)
-res.status(200).json({message:"user deleted ",
-data:deleteUser
-})
-    }catch(err){
-res.status(404).send("invaid user id")
-    }
-    
+
 })
 
 // this is the api, for update the user by id
 
-app.patch("/user", async(req,res)=>{
-    const userId =req.body.id
-    const user = req.body
-    try{
-        const userUpdate= await userSchema.findByIdAndUpdate({_id:userId},user)
+// app.patch("/user", async(req,res)=>{
+//     const {id,...update} = req.body
+//     try{
+
+//        const allowUpdate =["gender","age","about","profileURL","skills"]
+//         const upadateOnly = Object.keys(update).every((key)=>allowUpdate.includes(key))
+//         // we can also write the above line as 
+// //         let result = true;
+
+// // const keys = Object.keys(update);
+
+// // for (let i = 0; i < keys.length; i++) {
+
+// //     const key = keys[i];
+
+// //     if (!allowUpdate.includes(key)) {
+// //         result = false;
+// //         break;
+// //     }
+// // }
+
+// // console.log(result);
+//         if(!upadateOnly){
+//             throw new Error("Update Error")
+//         }
+//         const userUpdate= await userSchema.findByIdAndUpdate(id,update,{runValidators:true})
+//         res.send(userUpdate)
+
+//     }catch(err){
+//  res.status(404).send("user not found "+ err.message)
+//     }
+// })
+
+
+// the same above api with the id as paramas
+app.patch("/user/:userId", async (req, res) => {
+    const userId = req.params?.userId
+    const update = req.body
+    console.log(userId)
+    try {
+
+        const allowUpdate = ["gender", "age", "about", "profileURL", "skills"]
+        const upadateOnly = Object.keys(update).every((key) => allowUpdate.includes(key))
+        if (!upadateOnly) {
+            throw new Error("Update Error")
+        }
+        if (update?.skills.length > 10) {
+            throw new Error("can't have more then 10 skills")
+        }
+        const userUpdate = await userSchema.findByIdAndUpdate(userId, update, { runValidators: true })
+
         res.send(userUpdate)
 
-    }catch(err){
- res.status(404).send("user not found")
+    } catch (err) {
+        res.status(404).send(err.message)
     }
 })
 
 
 //this is the api for upadate the user by email
-app.patch("/userupdate", async(req,res)=>{
-    const {email, ...update}= req.body
-    try{
+app.patch("/userupdate", async (req, res) => {
+    const { email, ...update } = req.body
+    try {
         console.log(JSON.stringify(req.body))
-        const user= await userSchema.findOneAndUpdate({email},update)
-        if(!user){
+        const user = await userSchema.findOneAndUpdate({ email }, update, { runValidators: true })
+        if (!user) {
             res.status(404).send("invalid user")
         }
         res.send(user)
 
-    }catch(err){
- res.status(404).send("user not found")
+    } catch (err) {
+        res.status(404).send("user not found")
     }
 })
 
@@ -261,7 +385,7 @@ connectDB().then(() => {
         console.log("connted to the sever successfully")
     })
 }).catch(err => {
-    console.log("database is not connected", err)
+    console.log("database is not connected", err.message)
 })
 
 
